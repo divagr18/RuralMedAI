@@ -3,6 +3,11 @@
 **Track:** Health & Sciences  
 **Subtitle:** A local-first medical scribe that uses Gemma 4's audio understanding and instruction-following to turn consultation speech into structured, encrypted, claim-ready records.
 
+## Project Links
+
+- **Public code repository:** https://github.com/PrnvKK/RuralMedAI
+- **Video demo:** YouTube link placeholder
+
 ## Problem
 
 Small clinics often run on thin infrastructure: intermittent internet, limited staff, mixed-language consultations, and heavy documentation burden. A doctor may speak with a patient in Hinglish or another code-switched language, then still has to produce structured notes, capture vitals, document procedures, preserve follow-up context, and prepare evidence for insurance or welfare claims.
