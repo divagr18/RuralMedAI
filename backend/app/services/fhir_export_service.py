@@ -299,13 +299,13 @@ def _claim_text(patient: dict[str, Any]) -> str:
     parts = []
     for label, key in [
         ("Ration card", "ration_card_type"),
-        ("Income", "income_bracket"),
+        ("Income", "income"),
         ("Occupation", "occupation"),
         ("Caste category", "caste_category"),
         ("Housing", "housing_type"),
         ("Location", "location"),
     ]:
-        value = patient.get(key)
+        value = patient.get(key) or patient.get("income_bracket")
         if value:
             parts.append(f"{label}: {value}")
     return "; ".join(parts)

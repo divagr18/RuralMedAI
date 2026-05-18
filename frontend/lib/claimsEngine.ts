@@ -123,7 +123,7 @@ function lower(value: unknown) {
 }
 
 function incomeText(data: PatientData) {
-    return text(data.income_bracket || data.income);
+    return text(data.income || data.income_bracket);
 }
 
 function isNegativeSignal(value: unknown) {

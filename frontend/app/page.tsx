@@ -76,6 +76,8 @@ function hasMeaningfulPatientData(data: PatientData): boolean {
 
 export default function Home() {
     const [patientData, setPatientData] = useState<PatientData>({});
+    const patientDataRef = useRef<PatientData>(patientData);
+    patientDataRef.current = patientData;
     const [transcript, setTranscript] = useState<TranscriptItem[]>([]);
     const [activePatientId, setActivePatientId] = useState<number | null>(null);
 
@@ -349,7 +351,8 @@ export default function Home() {
     };
 
     const handleCommit = async () => {
-        if (!hasMeaningfulPatientData(patientData)) {
+        const currentData = patientDataRef.current;
+        if (!hasMeaningfulPatientData(currentData)) {
             alert('No patient data to commit.');
             return;
         }
@@ -368,9 +371,9 @@ export default function Home() {
 
         try {
             const payload: PatientData = isUpdate && activePatientId
-                ? { ...patientData, id: activePatientId }
+                ? { ...currentData, id: activePatientId }
                 : (() => {
-                    const { id, ...rest } = patientData;
+                    const { id, ...rest } = currentData;
                     return rest;
                 })();
             const updateEndpoint = activePatientId ? `http://localhost:8003/api/ehr/patients/${activePatientId}` : '';
@@ -434,7 +437,8 @@ export default function Home() {
     };
 
     const handleExportFhir = async () => {
-        if (!hasMeaningfulPatientData(patientData)) {
+        const currentData = patientDataRef.current;
+        if (!hasMeaningfulPatientData(currentData)) {
             alert('No patient data to export.');
             return;
         }
@@ -449,7 +453,7 @@ export default function Home() {
                 : {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(patientData),
+                    body: JSON.stringify(currentData),
                 });
 
             if (!response.ok) {
@@ -458,7 +462,7 @@ export default function Home() {
             }
 
             const bundle = await response.json();
-            const patientLabel = activePatientId || patientData.id || 'draft';
+            const patientLabel = activePatientId || currentData.id || 'draft';
             downloadJson(`parchee-fhir-${patientLabel}.json`, bundle);
             setTranscript(prev => [...prev, {
                 id: makeId('sys-fhir'),

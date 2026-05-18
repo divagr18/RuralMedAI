@@ -39,7 +39,10 @@ class PatientData(BaseModel):
 
     # Eligibility & Schemes
     ration_card_type: Optional[str] = Field(None, description="e.g., BPL, Antyodaya (AAY), PHH")
-    income_bracket: Optional[str] = Field(None, description="Reported annual income")
+    income: Optional[str] = Field(None, description="Reported income (monthly or annual)")
+
+    # Legacy key kept for backward compatibility with old DB records / snapshots
+    income_bracket: Optional[str] = Field(None, description="Deprecated – use income")
     occupation: Optional[str] = Field(None, description="Primary occupation (e.g., Casual Labour, Farmer)")
     caste_category: Optional[str] = Field(None, description="SC/ST/General/OBC")
     housing_type: Optional[str] = Field(None, description="Kucha/Pucca house")
@@ -66,7 +69,9 @@ class PatientData(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def normalize_legacy_income_field(cls, values: Any) -> Any:
-        if isinstance(values, dict) and not values.get("income_bracket") and values.get("income"):
+        """Normalize legacy income_bracket into income."""
+        if isinstance(values, dict):
             values = dict(values)
-            values["income_bracket"] = values["income"]
+            if not values.get("income") and values.get("income_bracket"):
+                values["income"] = values["income_bracket"]
         return values

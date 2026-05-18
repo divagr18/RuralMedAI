@@ -110,7 +110,7 @@ export function LiveForm({ data, onFieldChange }: LiveFormProps) {
                         <div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-foreground">
                                 <InputField label="Ration Card" name="ration_card_type" register={syncedRegister} highlight={lastUpdatedField === 'ration_card_type'} placeholder="Yes/No" />
-                                <InputField label="Income" name="income_bracket" register={syncedRegister} highlight={lastUpdatedField === 'income_bracket'} placeholder="Per month" />
+                                <InputField label="Income" name="income" register={syncedRegister} highlight={lastUpdatedField === 'income'} placeholder="Per month" />
                                 <InputField label="Occupation" name="occupation" register={syncedRegister} highlight={lastUpdatedField === 'occupation'} placeholder="Occupation" />
                                 <InputField label="Caste" name="caste_category" register={syncedRegister} highlight={lastUpdatedField === 'caste_category'} placeholder="SC/ST/OBC" />
                                 <InputField label="Housing" name="housing_type" register={syncedRegister} highlight={lastUpdatedField === 'housing_type'} placeholder="Kutcha/Pucca" />
@@ -249,7 +249,7 @@ function EligibilityStatus({ data }: { data: any }) {
     const requiredEligibilityFields = [
         data.age,
         data.ration_card_type,
-        data.income_bracket || data.income,
+        data.income || data.income_bracket,
         data.occupation,
         data.caste_category,
         data.housing_type,

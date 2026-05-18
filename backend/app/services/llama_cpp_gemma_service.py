@@ -33,7 +33,7 @@ SUPPORTED_FIELDS = {
     "medications",
     "procedures",
     "ration_card_type",
-    "income_bracket",
+    "income",
     "occupation",
     "caste_category",
     "housing_type",
@@ -432,7 +432,7 @@ Goals:
 
 Supported fields:
 name, age, gender, chief_complaint, symptoms, medical_history, family_history,
-allergies, medications, procedures, ration_card_type, income_bracket, occupation,
+allergies, medications, procedures, ration_card_type, income, occupation,
 caste_category, housing_type, location, tentative_doctor_diagnosis,
 initial_llm_diagnosis, transcript_summary, vitals.temperature,
 vitals.blood_pressure, vitals.pulse, vitals.spo2

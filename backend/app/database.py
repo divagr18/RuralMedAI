@@ -155,7 +155,7 @@ def save_patient(data: PatientData):
         to_json(data.medications),
         encrypt_text(data.transcript_summary),
         encrypt_text(data.ration_card_type),
-        encrypt_text(data.income_bracket),
+        encrypt_text(data.income),
         encrypt_text(data.occupation),
         encrypt_text(data.caste_category),
         encrypt_text(data.housing_type),
@@ -228,7 +228,7 @@ def update_patient(patient_id: int, data: PatientData):
         encrypt_text(data.initial_llm_diagnosis),
         to_json(data.medications),
         encrypt_text(data.ration_card_type),
-        encrypt_text(data.income_bracket),
+        encrypt_text(data.income),
         encrypt_text(data.occupation),
         encrypt_text(data.caste_category),
         encrypt_text(data.housing_type),
@@ -286,6 +286,7 @@ def get_all_patients():
             'pulse': p.pop('pulse', None),
             'spo2': p.pop('spo2', None)
         }
+        p['income'] = p.pop('income_bracket', None)
         patients.append(p)
     
     conn.close()
@@ -326,6 +327,7 @@ def get_patient_by_id(patient_id: int):
             'pulse': p.pop('pulse', None),
             'spo2': p.pop('spo2', None)
         }
+        p['income'] = p.pop('income_bracket', None)
         return p
     return None
 
