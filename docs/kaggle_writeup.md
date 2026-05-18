@@ -27,7 +27,7 @@ Gemma 4 returns strict JSON with:
 
 The live UI updates demographics, chief complaint, symptoms, vitals, history, allergies, medications, procedures, clinician-stated diagnoses, Gemma 4 documentation insights, and social/claim-readiness fields such as ration card type, income, occupation, caste category, housing type, and location.
 
-After clinician review, the encounter is committed to encrypted PostgreSQL storage. Background tasks generate a Gemma 4 summary and run offline ICD-10-CM / ICD-10-PCS coding so the Diagnostics and Billing Center can show auto-coded claims for review.
+After clinician review, the encounter is committed to encrypted PostgreSQL storage. Background tasks generate a Gemma 4 summary and run offline ICD-10-CM / ICD-10-PCS coding so the Diagnostics and Billing Center can show auto-coded claims for review. The same structured record can also be exported as an MVP FHIR R4 Bundle, giving the demo a standards-aligned interoperability path.
 
 ## How We Used Gemma 4
 
@@ -49,7 +49,7 @@ The application has four main layers.
 
 The frontend is a Next.js app. It records audio, displays the live clinical sheet, persists draft session state, and exposes patient, claims, and diagnostics views.
 
-The FastAPI backend owns the WebSocket session, VAD, schema validation, encrypted persistence, billing automation, and API endpoints. It sends simple WebSocket messages to the UI: `content` events for transcript/status text and `update` events for structured form patches.
+The FastAPI backend owns the WebSocket session, VAD, schema validation, encrypted persistence, billing automation, FHIR export, and API endpoints. It sends simple WebSocket messages to the UI: `content` events for transcript/status text and `update` events for structured form patches.
 
 The local inference layer is llama.cpp. Gemma 4 works well here because the task rewards compact, disciplined responses more than free-form conversation. We use a no-thinking Gemma 4 chat template, `--reasoning off`, `--reasoning-budget 0`, `--ctx-size 2048`, four inference threads by default, and GPU offload with `--n-gpu-layers 999` when CUDA is available. This keeps responses focused and latency reasonable on edge hardware. It also makes the repository easy to validate: the Gemma 4 model, projector, prompt, template, and server command are all visible.
 
@@ -71,7 +71,7 @@ Parchee Edge is designed for clinics that cannot rely on constant cloud connecti
 
 That coherence is important. Gemma 4 lets us build an edge product where the model is close to the patient, close to the clinician, and close to the data. The result is not a remote oracle; it is a local documentation partner that turns spoken care into usable records.
 
-The proof of work is in the implemented pipeline: browser audio capture, adaptive VAD, Gemma 4 audio understanding via llama.cpp, strict JSON extraction, live UI updates, Gemma 4 summaries and notes, encrypted EHR persistence, Docker CUDA deployment, automatic model download, offline ICD/PCS coding, and a public repository that exposes each part.
+The proof of work is in the implemented pipeline: browser audio capture, adaptive VAD, Gemma 4 audio understanding via llama.cpp, strict JSON extraction, live UI updates, Gemma 4 summaries and notes, encrypted EHR persistence, Docker CUDA deployment, automatic model download, offline ICD/PCS coding, FHIR R4 JSON export, and a public repository that exposes each part.
 
 ## Next Steps
 

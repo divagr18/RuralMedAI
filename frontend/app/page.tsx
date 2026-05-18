@@ -6,7 +6,7 @@ import { AudioChunk, useAudioStream } from '@/hooks/useAudioStream';
 import { LiveForm } from '@/components/LiveForm';
 import { AudioVisualizer } from '@/components/AudioVisualizer';
 import { PatientData, TranscriptItem } from '@/types';
-import { Mic, Square, Save, RefreshCw, FileText, ShieldCheck, Eraser, Clock3, Plus } from 'lucide-react';
+import { Mic, Square, Save, RefreshCw, FileText, Eraser, Clock3, Plus, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { clearScribeSession, loadScribeSession, saveScribeSession } from '@/lib/sessionStore';
@@ -24,6 +24,18 @@ function nowClock() {
 
 function makeId(prefix: string) {
     return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function downloadJson(filename: string, payload: unknown) {
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/fhir+json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
 }
 
 function applyPatientUpdate(prev: PatientData, field: string, value: unknown): PatientData {
@@ -105,6 +117,7 @@ export default function Home() {
     const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
     const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
     const [isCommiting, setIsCommiting] = useState(false);
+    const [isExportingFhir, setIsExportingFhir] = useState(false);
     const [stopRequested, setStopRequested] = useState(false);
 
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -420,6 +433,47 @@ export default function Home() {
         }
     };
 
+    const handleExportFhir = async () => {
+        if (!hasMeaningfulPatientData(patientData)) {
+            alert('No patient data to export.');
+            return;
+        }
+
+        setIsExportingFhir(true);
+        try {
+            const endpoint = activePatientId
+                ? `http://localhost:8003/api/ehr/patients/${activePatientId}/fhir`
+                : 'http://localhost:8003/api/ehr/fhir/export';
+            const response = await fetch(endpoint, activePatientId
+                ? undefined
+                : {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(patientData),
+                });
+
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                throw new Error(error.detail || 'FHIR export failed');
+            }
+
+            const bundle = await response.json();
+            const patientLabel = activePatientId || patientData.id || 'draft';
+            downloadJson(`parchee-fhir-${patientLabel}.json`, bundle);
+            setTranscript(prev => [...prev, {
+                id: makeId('sys-fhir'),
+                type: 'text',
+                content: `System: Exported FHIR R4 bundle (${bundle.entry?.length ?? 0} resources).`,
+                timestamp: nowClock()
+            }]);
+        } catch (error) {
+            console.error(error);
+            alert('Failed to export FHIR bundle. Check backend connection.');
+        } finally {
+            setIsExportingFhir(false);
+        }
+    };
+
     return (
         <main className="h-screen flex flex-col bg-background text-foreground overflow-hidden text-[13px]">
             {/* Scribe Toolbar */}
@@ -468,6 +522,18 @@ export default function Home() {
                             </button>
                         </div>
                     </div>
+
+                    <div className="h-5 w-px bg-border/50" />
+
+                    <button
+                        onClick={handleExportFhir}
+                        disabled={isExportingFhir}
+                        className="flex items-center gap-2 px-3 py-2 bg-white text-primary rounded-xl border border-primary/15 text-[10px] font-bold hover:bg-primary/5 transition-all disabled:opacity-50 uppercase tracking-widest"
+                        title="Export current encounter as FHIR R4 JSON"
+                    >
+                        {isExportingFhir ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                        FHIR
+                    </button>
 
                     <div className="h-5 w-px bg-border/50" />
 

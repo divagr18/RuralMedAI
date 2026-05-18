@@ -2,9 +2,21 @@
 
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, User, Activity, Calendar, FileText, Search, ClipboardList, Trash2, ChevronRight, Receipt, Stethoscope, RefreshCw } from 'lucide-react';
+import { ArrowLeft, User, Activity, Calendar, FileText, Search, ClipboardList, Trash2, ChevronRight, Receipt, Stethoscope, RefreshCw, Download } from 'lucide-react';
 import Link from 'next/link';
 import { getAyushmanTemplate, getCGHSTemplate, getECHSTemplate } from '../utils/documentTemplates';
+
+function downloadJson(filename: string, payload: unknown) {
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/fhir+json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}
 
 export default function PatientsPage() {
     const [patients, setPatients] = useState<any[]>([]);
@@ -42,6 +54,24 @@ export default function PatientsPage() {
             }, 500);
         }
         setPatientToExport(null);
+    };
+
+    const handleFhirExport = async () => {
+        if (!patientToExport?.id) return;
+
+        try {
+            const response = await fetch(`http://localhost:8003/api/ehr/patients/${patientToExport.id}/fhir`);
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                throw new Error(error.detail || 'FHIR export failed');
+            }
+            const bundle = await response.json();
+            downloadJson(`parchee-fhir-${patientToExport.id}.json`, bundle);
+            setPatientToExport(null);
+        } catch (error) {
+            console.error(error);
+            alert("Failed to export FHIR bundle");
+        }
     };
 
     useEffect(() => {
@@ -388,6 +418,17 @@ export default function PatientsPage() {
                                 </div>
 
                                 <div className="grid grid-cols-1 gap-3">
+                                    <button
+                                        onClick={handleFhirExport}
+                                        className="group flex items-center justify-between p-4 rounded-lg bg-white/5 border border-slate-200 hover:bg-white/10 hover:border-slate-500/50 transition-all"
+                                    >
+                                        <div className="text-left">
+                                            <div className="text-sm font-bold text-slate-900 group-hover:text-slate-700 transition-colors">FHIR R4 Bundle</div>
+                                            <div className="text-[10px] text-slate-400 font-mono">Interoperability JSON Export</div>
+                                        </div>
+                                        <Download className="w-4 h-4 text-slate-400 group-hover:text-slate-700" />
+                                    </button>
+
                                     <button
                                         onClick={() => handleExport('AYUSHMAN')}
                                         className="group flex items-center justify-between p-4 rounded-lg bg-white/5 border border-slate-200 hover:bg-white/10 hover:border-emerald-500/50 transition-all"

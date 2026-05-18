@@ -56,6 +56,10 @@ class BillingCodesPatch(BaseModel):
     billing_summary: Optional[Dict[str, Any]] = None
 
 
+class FHIRExportRequest(PatientData):
+    pass
+
+
 # ---------------------------------------------------------------------------
 # Background tasks
 # ---------------------------------------------------------------------------
@@ -210,6 +214,35 @@ async def delete_patient_endpoint(patient_id: int):
         delete_patient(patient_id)
         return {"status": "success", "message": f"Patient {patient_id} deleted"}
     except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/patients/{patient_id}/fhir")
+async def export_patient_fhir(patient_id: int):
+    """Return an MVP FHIR R4 Bundle for a stored patient record."""
+    try:
+        patient = get_patient_by_id(patient_id)
+        if not patient:
+            raise HTTPException(status_code=404, detail="Patient not found")
+        from app.services.fhir_export_service import build_patient_bundle
+
+        return build_patient_bundle(patient)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("FHIR export error for patient %d: %s", patient_id, exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/fhir/export")
+async def export_current_fhir(data: FHIRExportRequest):
+    """Return an MVP FHIR R4 Bundle for the current unsaved scribe state."""
+    try:
+        from app.services.fhir_export_service import build_patient_bundle
+
+        return build_patient_bundle(data.model_dump())
+    except Exception as exc:
+        logger.error("FHIR draft export error: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
 
 
