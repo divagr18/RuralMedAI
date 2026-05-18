@@ -25,3 +25,10 @@ env/
 # Pitch Deck Assets
 pitch_deck_images/
 *.zip
+
+# Local model and generated index artifacts
+*.gguf
+backend/llama_cpp/bin/
+backend/llama_cpp/models/
+backend/data/chroma/
+backend/data/tfidf_cache/

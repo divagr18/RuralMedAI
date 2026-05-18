@@ -1,6 +1,12 @@
 import { useState, useRef, useCallback } from 'react';
 
-export const useAudioStream = (onAudioChunk: (data: string) => void) => {
+export interface AudioChunk {
+    data: string;
+    rms: number;
+    durationMs: number;
+}
+
+export const useAudioStream = (onAudioChunk: (chunk: AudioChunk) => void) => {
     const [isRecording, setIsRecording] = useState(false);
     const audioContextRef = useRef<AudioContext | null>(null);
     const workletNodeRef = useRef<AudioWorkletNode | null>(null);
@@ -20,7 +26,7 @@ export const useAudioStream = (onAudioChunk: (data: string) => void) => {
 
     const startRecording = useCallback(async (deviceId?: string) => {
         try {
-            // 1. Init AudioContext at 16kHz to match Gemini requirement
+            // 1. Init AudioContext at 16kHz to match Gemma 4 audio requirements
             const audioContext = new AudioContext({ sampleRate: 16000 });
             audioContextRef.current = audioContext;
 
@@ -48,7 +54,11 @@ export const useAudioStream = (onAudioChunk: (data: string) => void) => {
                 const int16Data = event.data; // ArrayBuffer from worklet
                 // Convert to Base64 to send over WebSocket
                 const base64String = arrayBufferToBase64(int16Data);
-                onAudioChunk(base64String);
+                onAudioChunk({
+                    data: base64String,
+                    rms: calculateRms(int16Data),
+                    durationMs: (int16Data.byteLength / 2 / 16000) * 1000,
+                });
             };
 
             // 6. Connect Graph
@@ -91,4 +101,16 @@ function arrayBufferToBase64(buffer: ArrayBuffer) {
         binary += String.fromCharCode(bytes[i]);
     }
     return window.btoa(binary);
+}
+
+function calculateRms(buffer: ArrayBuffer) {
+    const samples = new Int16Array(buffer);
+    if (!samples.length) return 0;
+
+    let squareSum = 0;
+    for (let i = 0; i < samples.length; i++) {
+        squareSum += samples[i] * samples[i];
+    }
+
+    return Math.sqrt(squareSum / samples.length);
 }

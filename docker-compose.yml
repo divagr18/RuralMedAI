@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: ruralmed-postgres
+    container_name: parchee-postgres
     environment:
       POSTGRES_DB: ruralmed
       POSTGRES_USER: postgres
@@ -16,63 +16,105 @@ services:
       timeout: 5s
       retries: 5
 
+  gemma-models:
+    image: curlimages/curl:8.11.1
+    container_name: parchee-gemma-models
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        mkdir -p /models
+        if [ ! -s /models/gemma-4.gguf ]; then
+          echo "Downloading Gemma 4 model..."
+          curl -L --fail --retry 5 --retry-delay 5 -o /models/gemma-4.gguf "$$LLAMA_SERVER_MODEL_URL"
+        else
+          echo "Gemma 4 model already present."
+        fi
+        if [ ! -s /models/mmproj.gguf ]; then
+          echo "Downloading Gemma 4 mmproj..."
+          curl -L --fail --retry 5 --retry-delay 5 -o /models/mmproj.gguf "$$LLAMA_SERVER_MMPROJ_URL"
+        else
+          echo "Gemma 4 mmproj already present."
+        fi
+    environment:
+      LLAMA_SERVER_MODEL_URL: ${LLAMA_SERVER_MODEL_URL:-https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_K_M.gguf?download=true}
+      LLAMA_SERVER_MMPROJ_URL: ${LLAMA_SERVER_MMPROJ_URL:-https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/mmproj-BF16.gguf?download=true}
+    volumes:
+      - llama_models:/models
+
+  llama-server:
+    image: ${LLAMA_CPP_DOCKER_IMAGE:-ghcr.io/ggml-org/llama.cpp:server-cuda}
+    container_name: parchee-llama-server
+    gpus: all
+    command:
+      - -m
+      - /models/gemma-4.gguf
+      - --mmproj
+      - /models/mmproj.gguf
+      - --chat-template-file
+      - /templates/gemma4_no_think.jinja
+      - --reasoning
+      - "off"
+      - --reasoning-budget
+      - "0"
+      - --ctx-size
+      - ${LLAMA_SERVER_CTX_SIZE:-2048}
+      - -t
+      - ${LLAMA_SERVER_THREADS:-4}
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - --n-gpu-layers
+      - ${LLAMA_SERVER_N_GPU_LAYERS:-999}
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    ports:
+      - "8080:8080"
+    volumes:
+      - llama_models:/models:ro
+      - ./backend/llama_templates:/templates:ro
+    depends_on:
+      gemma-models:
+        condition: service_completed_successfully
+
   backend:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    container_name: ruralmed-backend
-    shm_size: '2g'          # Required for PyTorch multi-process embedding pool
+    container_name: parchee-backend
+    shm_size: '2g'
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ruralmed
       AES_256_KEY: ${AES_256_KEY}
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
-      USE_LOCAL_ML: ${USE_LOCAL_ML:-false}
-      ML_NODE_URL: ${ML_NODE_URL:-ws://ml-service:8002/ws/process-audio}
-    env_file:
-      - .env
+      LLAMA_CPP_MODE: auto
+      LLAMA_CPP_BASE_URL: http://llama-server:8080
+      LLAMA_CPP_MODEL_NAME: gemma-4
+      LLAMA_CPP_TIMEOUT_SECONDS: ${LLAMA_CPP_TIMEOUT_SECONDS:-180}
+      LLAMA_CPP_MAX_TOKENS: ${LLAMA_CPP_MAX_TOKENS:-512}
+      LLAMA_SERVER_AUTOSTART: "false"
     ports:
       - "8003:8003"
     volumes:
-      - backend_data:/app/backend/data   # Persist ChromaDB — no re-indexing on restart
+      - backend_data:/app/backend/data
     depends_on:
       postgres:
         condition: service_healthy
-      ml-service:
+      llama-server:
         condition: service_started
-
-  ml-service:
-    platform: linux/amd64
-    build:
-      context: .
-      dockerfile: ml_service/Dockerfile
-    container_name: ruralmed-ml-service
-    gpus: all
-    environment:
-      GROQ_API_KEY: ${GROQ_API_KEY}
-      LLAMA_MODEL_PATH: ${LLAMA_MODEL_PATH:-/models/Qwen3.5-2B-UD-Q4_K_XL.gguf}
-      LLAMA_MODEL_URL: ${LLAMA_MODEL_URL:-}
-      LLAMA_PORT: ${LLAMA_PORT:-8081}
-      ML_PORT: ${ML_PORT:-8002}
-      NVIDIA_VISIBLE_DEVICES: all
-      NVIDIA_DRIVER_CAPABILITIES: compute,utility
-    env_file:
-      - .env
-    ports:
-      - "8002:8002"
-      - "8081:8081"
-    volumes:
-      - ml_models:/models
 
   frontend:
     build:
       context: .
       dockerfile: frontend/Dockerfile
-    container_name: ruralmed-frontend
+    container_name: parchee-frontend
     environment:
-      NEXT_PUBLIC_API_BASE_URL: http://backend:8003
-      NEXT_PUBLIC_WS_URL: ws://backend:8003/ws/live-consultation
-    env_file:
-      - .env
+      # These URLs are used by browser-side code, so they must point at the
+      # host-published backend port rather than the Docker service hostname.
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8003
+      NEXT_PUBLIC_WS_URL: ws://localhost:8003/ws/live-consultation
+      NEXT_PUBLIC_PARCHEE_SEND_INTERVAL_MS: ${NEXT_PUBLIC_PARCHEE_SEND_INTERVAL_MS:-500}
     ports:
       - "3000:3000"
     depends_on:
@@ -81,4 +123,4 @@ services:
 volumes:
   postgres_data:
   backend_data:
-  ml_models:
+  llama_models:

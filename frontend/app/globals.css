@@ -1,38 +1,38 @@
-@import "tailwindcss";
-@plugin "tailwindcss-animate";
+@import "../node_modules/tailwindcss";
+@plugin "../node_modules/tailwindcss-animate";
 
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: hsl(50 20% 98%); /* Off-white / Cream */
-  --foreground: hsl(0 0% 10%); /* Deep charcoal */
+  --background: hsl(0 0% 98%);
+  --foreground: hsl(0 0% 8%);
   --card: hsl(0 0% 100%);
   --card-foreground: hsl(0 0% 10%);
   --popover: hsl(0 0% 100%);
   --popover-foreground: hsl(0 0% 10%);
-  --primary: hsl(70 45% 18%); /* Rich Olive Green */
+  --primary: hsl(0 0% 7%);
   --primary-foreground: hsl(0 0% 100%);
-  --secondary: hsl(70 20% 94%);
-  --secondary-foreground: hsl(70 40% 15%);
-  --muted: hsl(70 10% 94%);
-  --muted-foreground: hsl(70 10% 40%);
-  --accent: hsl(70 30% 90%);
-  --accent-foreground: hsl(70 45% 18%);
+  --secondary: hsl(0 0% 94%);
+  --secondary-foreground: hsl(0 0% 12%);
+  --muted: hsl(0 0% 94%);
+  --muted-foreground: hsl(0 0% 40%);
+  --accent: hsl(0 0% 90%);
+  --accent-foreground: hsl(0 0% 10%);
   --destructive: hsl(0 84.2% 60.2%);
   --destructive-foreground: hsl(0 0% 98%);
-  --border: hsl(70 15% 90%);
-  --input: hsl(70 15% 90%);
-  --ring: hsl(70 45% 18%);
-  --radius: 1.5rem; /* More generous radius for premium feel */
+  --border: hsl(0 0% 88%);
+  --input: hsl(0 0% 88%);
+  --ring: hsl(0 0% 24%);
+  --radius: 0.75rem;
 }
 
 /* Dark mode placeholder - currently using same palette as light for premium olive consistency */
 .dark {
-  --background: hsl(70 15% 4%);
-  --foreground: hsl(70 10% 98%);
-  --primary: hsl(70 45% 18%);
-  --muted-foreground: hsl(70 10% 60%);
-  --border: hsl(70 15% 15%);
+  --background: hsl(0 0% 4%);
+  --foreground: hsl(0 0% 98%);
+  --primary: hsl(0 0% 98%);
+  --muted-foreground: hsl(0 0% 62%);
+  --border: hsl(0 0% 16%);
 }
 
 @theme inline {
@@ -54,6 +54,8 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --font-sans: var(--font-inter);
+  --font-outfit: var(--font-outfit);
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);

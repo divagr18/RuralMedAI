@@ -10,13 +10,13 @@ class PCMProcessor extends AudioWorkletProcessor {
 
         const channelData = input[0]; // Mono processing
 
-        // We need to convert 32-bit float (Browser default) to 16-bit Int (Gemini requirement)
+        // We need to convert 32-bit float (browser default) to 16-bit PCM for Gemma 4 audio input
         // We also need to downsample if the context is 44.1/48kHz, but usually we handle that 
         // by setting context sampleRate. For now, we assume input is getting resampled 
         // or we just send raw chunks and handle complexity.
 
-        // Actually, simpler approach for Gemini Realtime:
-        // It accepts 16kHz Little Endian PCM.
+        // Gemma 4 audio ingestion expects mono PCM/WAV-style audio:
+        // We stream 16kHz little-endian PCM to the backend VAD segmenter.
         // The AudioContext in the hook will handle the sample rate (16000).
         // Here we just convert Float32 -> Int16.
 

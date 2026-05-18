@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useSocket } from '@/hooks/useSocket';
-import { useAudioStream } from '@/hooks/useAudioStream';
+import { AudioChunk, useAudioStream } from '@/hooks/useAudioStream';
 import { LiveForm } from '@/components/LiveForm';
 import { AudioVisualizer } from '@/components/AudioVisualizer';
 import { PatientData, TranscriptItem } from '@/types';
@@ -10,6 +10,8 @@ import { Mic, Square, Save, RefreshCw, FileText, ShieldCheck, Eraser, Clock3, Pl
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { clearScribeSession, loadScribeSession, saveScribeSession } from '@/lib/sessionStore';
+
+const SEND_INTERVAL_MS = Number(process.env.NEXT_PUBLIC_PARCHEE_SEND_INTERVAL_MS || 500);
 
 function nowClock() {
     return new Date().toLocaleTimeString([], {
@@ -103,8 +105,12 @@ export default function Home() {
     const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
     const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
     const [isCommiting, setIsCommiting] = useState(false);
+    const [stopRequested, setStopRequested] = useState(false);
 
     const scrollRef = useRef<HTMLDivElement>(null);
+    const audioBufferRef = useRef<AudioChunk[]>([]);
+    const disconnectRef = useRef<() => void>(() => { });
+    const stoppingRef = useRef(false);
 
     useEffect(() => {
         const snapshot = loadScribeSession();
@@ -146,6 +152,13 @@ export default function Home() {
     const handleMessage = useCallback((data: any) => {
         const ts = nowClock();
 
+        if (data.type === 'session_complete') {
+            disconnectRef.current();
+            setStopRequested(false);
+            stoppingRef.current = false;
+            return;
+        }
+
         if (data.type === 'update' && data.field) {
             setPatientData(prev => applyPatientUpdate(prev, data.field, data.value));
             setTranscript(prev => ([
@@ -184,19 +197,35 @@ export default function Home() {
     }, []);
 
     const { isConnected, connect, disconnect, sendMessage } = useSocket(handleMessage);
+    disconnectRef.current = disconnect;
 
-    const onAudioChunk = useCallback((base64Audio: string) => {
-        if (!isConnected) return;
-
-        sendMessage({
-            realtimeInput: {
-                mediaChunks: [{
-                    mimeType: 'audio/pcm',
-                    data: base64Audio
-                }]
+    const flushAudioBuffer = useCallback((final = false) => {
+        if (!isConnected || audioBufferRef.current.length === 0) {
+            if (final && isConnected) {
+                sendMessage({ type: 'end_session' });
             }
-        });
+            return;
+        }
+
+        const chunks = audioBufferRef.current.map(chunk => ({
+            mimeType: 'audio/pcm',
+            data: chunk.data,
+            rms: chunk.rms,
+            durationMs: chunk.durationMs,
+        }));
+        audioBufferRef.current = [];
+
+        sendMessage({ realtimeInput: { mediaChunks: chunks } });
+        if (final) {
+            sendMessage({ type: 'end_session' });
+        }
     }, [isConnected, sendMessage]);
+
+    const onAudioChunk = useCallback((chunk: AudioChunk) => {
+        if (isConnected) {
+            audioBufferRef.current.push(chunk);
+        }
+    }, [isConnected]);
 
     const { isRecording, startRecording, stopRecording, getAudioDevices } = useAudioStream(onAudioChunk);
 
@@ -211,21 +240,37 @@ export default function Home() {
     }, [getAudioDevices]);
 
     useEffect(() => {
-        if (isConnected && !isRecording) {
+        if (isConnected && !isRecording && !stopRequested && !stoppingRef.current) {
             startRecording(selectedDeviceId);
         }
-    }, [isConnected, isRecording, startRecording, selectedDeviceId]);
+    }, [isConnected, isRecording, startRecording, selectedDeviceId, stopRequested]);
 
-    const handleStart = () => connect();
+    useEffect(() => {
+        if (!isConnected || !isRecording) return;
+        const interval = window.setInterval(() => flushAudioBuffer(false), SEND_INTERVAL_MS);
+        return () => window.clearInterval(interval);
+    }, [flushAudioBuffer, isConnected, isRecording]);
+
+    const handleStart = () => {
+        audioBufferRef.current = [];
+        setStopRequested(false);
+        stoppingRef.current = false;
+        connect();
+    };
 
     const handleStop = () => {
+        stoppingRef.current = true;
+        setStopRequested(true);
         stopRecording();
-        disconnect();
+        window.setTimeout(() => flushAudioBuffer(true), 150);
     };
 
     const handleResetSession = () => {
         stopRecording();
         disconnect();
+        setStopRequested(false);
+        stoppingRef.current = false;
+        audioBufferRef.current = [];
         setActivePatientId(null);
         setEntryMode('create');
         setPatientData({});
@@ -487,7 +532,7 @@ export default function Home() {
                         <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary/80">Session Stream</h3>
                         <div className="flex items-center gap-2 text-[9px] text-muted-foreground font-bold tracking-tighter">
                             <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-primary shadow-[0_0_8px_rgba(75,83,32,0.5)]' : 'bg-border'}`} />
-                            {isConnected ? 'STREAMING' : 'OFFLINE'}
+                            {isConnected ? (stopRequested ? 'FINALIZING' : 'STREAMING') : 'OFFLINE'}
                         </div>
                     </div>
 

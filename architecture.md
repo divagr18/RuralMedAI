@@ -1,105 +1,125 @@
-# Parchee.ai System Architecture
+# Parchee Edge Architecture
 
-The following diagram illustrates the high-level architecture of Parchee.ai, centered around three core pillars: **Transcription**, **Documentation**, and **Insurance**. It highlights the flow from patient interaction to revenue output, powered by a robust backend and advanced AI models.
+Parchee Edge is organized around one local inference loop: browser audio becomes short speech windows, Gemma 4 converts those windows into structured clinical updates, and local coding services turn reviewed encounters into billing-ready evidence.
+
+## System Diagram
 
 ```mermaid
-graph TB
-    %% Styling
-    classDef core fill:#f9f9f9,stroke:#333,stroke-width:2px;
-    classDef input fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
-    classDef process fill:#fff3e0,stroke:#e65100,stroke-width:2px;
-    classDef output fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px;
-    classDef ext fill:#eceff1,stroke:#546e7a,stroke-dasharray: 5 5;
-
-    %% User Layer
-    subgraph UserLayer["User Interaction"]
-        direction LR
-        P([Patient]) <--> |Voice/Consultation| D([Doctor])
-        D <--> |"Parchee.ai Interface (Next.js)"| Frontend
+flowchart TB
+    subgraph Browser["Next.js Frontend"]
+        Mic["Microphone"]
+        Worklet["AudioWorklet\n16 kHz mono PCM"]
+        Form["Live intake sheet"]
+        BillingUI["Diagnostics / billing center"]
     end
 
-    %% Application Layer
-    subgraph AppLayer["Application Logic (FastAPI Backend)"]
-        direction TB
-        API["API Gateway / WebSocket Handler"]
-
-        subgraph Core1["1. Transcription (Input Engine)"]
-            direction TB
-            Bharat["'Bharat' Engine<br/>(Dialect/Zero-shot ASR)"]
-            Trans["Medical Translation<br/>(Colloquial to ICD-10)"]
-            Extract["Entity Extraction<br/>(Vitals, Symptoms, Dx)"]
-        end
-
-        subgraph Core2["2. Documentation (Clinical Process)"]
-            direction TB
-            TaskID["Task Transaction ID Manager"]
-            Summaries["Role-Based Summary Generator<br/>(Doctor/Nurse/Pharma)"]
-            Safety["Safety Conflict Engine<br/>(DDI & Allergies)"]
-            Alerts["Critical Alert Flagging"]
-        end
-
-        subgraph Core3["3. Insurance (Revenue Output)"]
-            direction TB
-            Schemes["Scheme-Specific Generators<br/>(PM-JAY, CGHS, ECHS)"]
-            Gap["Pre-Claim Gap Analysis"]
-            Audit["Forensic Audit Trails"]
-            AutoCode["ICD-10 Auto-Coding"]
-        end
+    subgraph Backend["FastAPI Backend"]
+        WS["WebSocket session handler"]
+        VAD["Adaptive VAD\nRMS speech gate"]
+        Prompt["Compact patient-state prompt"]
+        Validate["JSON parser + schema validator"]
+        EHR["Encrypted EHR persistence"]
+        Summary["Gemma 4 summary\n+ clinical note drafting"]
+        Coding["ICD-10-CM / ICD-10-PCS coding"]
     end
 
-    %% External Intelligence Layer
-    subgraph AI["Intelligence Layer"]
-        Gemini["Google Gemini<br/>(Multimodal Live API)"]
+    subgraph LlamaCpp["Local llama.cpp Runtime"]
+        Manager["llama_server_manager.py\nstart/download/monitor"]
+        Server["llama-server"]
+        Gemma["Gemma 4 E2B GGUF\n+ mmproj"]
     end
 
-    %% Data Layer
-    subgraph Data["Data Layer"]
-        DB[(Secure Database<br/>Immutable Logs)]
+    subgraph Retrieval["Offline Coding Indexes"]
+        TFIDF["Word TF-IDF"]
+        Char["Char n-gram TF-IDF"]
+        Chroma["ChromaDB semantic index\nall-MiniLM-L6-v2"]
     end
 
-    %% Connections
-    Frontend <--> |WebSocket/REST| API
-    API --> Core1
-    
-    %% Core 1 Flow
-    Core1 <--> |Audio/Video Stream| Gemini
-    Bharat --> Trans --> Extract
-    Extract --> Core2
-
-    %% Core 2 Flow
-    Core2 --> |"Structured Data"| DB
-    Core2 --> |"Real-time Alerts"| Frontend
-    TaskID --> Summaries --> Safety
-
-    %% Core 3 Flow
-    Core3 --> |"Fetch Data"| DB
-    Core3 --> |"Generate Claims"| Frontend
-    Gap --> Schemes
-    
-    %% Apply Styling
-    class Core1 input
-    class Core2 process
-    class Core3 output
-    class Gemini,DB ext
-    class Frontend,API core
+    Mic --> Worklet --> WS
+    WS --> VAD --> Prompt --> Server
+    Manager --> Server
+    Server --> Gemma
+    Gemma --> Validate --> Form
+    Form --> EHR
+    EHR --> Summary
+    EHR --> Coding
+    Coding --> TFIDF
+    Coding --> Char
+    Coding --> Chroma
+    Coding --> BillingUI
 ```
 
-## detailed Components Breakdown
+## Audio Pipeline
 
-### 1. Transcription (The Input Engine)
-*Primary Goal: Zero-shot support for Indian rural dialects & Code-Switching.*
-- **'Bharat' Engine**: Handles *Bhojpuri*, *Maithili*, *Haryanvi* without fine-tuning.
-- **Medical Translation**: Maps colloquial terms ("Ghabrahat") to standardized *ICD-10* terminology.
-- **Multi-Modal Ingestion**: Captures voice and OCR inputs simultaneously.
+1. The browser captures microphone input and converts it to 16 kHz mono PCM.
+2. Audio frames are streamed to `/ws/live-consultation`.
+3. The backend uses adaptive VAD to ignore silence and flush natural speech windows.
+4. Each speech window is wrapped as WAV and sent to local `llama-server`.
+5. Gemma 4 returns strict JSON:
 
-### 2. Documentation (The Clinical Process)
-*Primary Goal: Ensure accountability and distinct outputs for every stakeholder.*
-- **Transaction ID Manager**: Assigns a unique ID to every task for auditability.
-- **Role-Based Summaries**: Generates *Clinical Note* (Doctor), *Administer List* (Nurse), and *Dispense List* (Pharmacy).
-- **Safety Conflict Engine**: Checks for *Drug-Drug Interactions* and *Allergy Contraindications* in real-time.
+```json
+{
+  "transcript": "patient says fever for three days",
+  "updates": [
+    {"field": "chief_complaint", "value": "fever for 3 days"},
+    {"field": "symptoms", "value": ["fever"]}
+  ]
+}
+```
 
-### 3. Insurance (The Revenue Output)
-*Primary Goal: Prevent revenue leakage and ensure claim acceptance.*
-- **Scheme Generators**: Automates forms for *Ayushman Bharat*, *CGHS*, *ECHS*.
-- **Pre-Claim Gap Analysis**: Acts as a "Spell Check" for insurance evidence.
-- **Forensic Audit Trails**: Timestamped, immutable logs for fraud auditing.
+## Gemma 4 Runtime
+
+The backend manages `llama-server` directly so the demo has a single startup path.
+
+Startup responsibilities:
+
+- Download `gemma-4.gguf` and `mmproj.gguf` if they are missing.
+- Start `llama-server` with the custom no-thinking template.
+- Use `--reasoning off`, `--reasoning-budget 0`, and `--ctx-size 2048`.
+- Add GPU offload through `LLAMA_SERVER_EXTRA_ARGS=-ngl 999` when available.
+- Stream llama.cpp logs into backend logs for debugging.
+
+Primary environment variables:
+
+```env
+LLAMA_SERVER_AUTOSTART=true
+LLAMA_SERVER_BINARY=llama_cpp/bin/llama-server.exe
+LLAMA_SERVER_MODEL=llama_cpp/models/gemma-4.gguf
+LLAMA_SERVER_MMPROJ=llama_cpp/models/mmproj.gguf
+LLAMA_SERVER_CTX_SIZE=2048
+LLAMA_SERVER_THREADS=4
+LLAMA_SERVER_EXTRA_ARGS=-ngl 999
+```
+
+## Structured Extraction Schema
+
+Gemma 4 updates are accepted only if their field names are in the backend schema. Supported fields include:
+
+- `name`, `age`, `gender`
+- `chief_complaint`, `symptoms`
+- `medical_history`, `family_history`, `allergies`, `medications`, `procedures`
+- `ration_card_type`, `income_bracket`, `occupation`, `caste_category`, `housing_type`, `location`
+- `tentative_doctor_diagnosis`, `initial_llm_diagnosis`, `transcript_summary`
+- `vitals.temperature`, `vitals.blood_pressure`, `vitals.pulse`, `vitals.spo2`
+
+List fields are merged and deduplicated across speech windows. Empty or malformed model responses are treated as no-op chunks so silence and noise do not crash the consultation.
+
+## Coding Pipeline
+
+ICD and procedure coding are separate from Gemma 4 generation. This keeps the app explainable and fast:
+
+- Exact code lookup returns immediately.
+- Word TF-IDF handles direct clinical terminology.
+- Character n-gram TF-IDF handles partial words and typos.
+- ChromaDB semantic search handles concept-level similarity.
+
+This makes the coding path offline after initial dependency setup and avoids sending patient records to a cloud embedding API.
+
+## Privacy Position
+
+The main pipeline is local-first:
+
+- Patient audio is processed by local Gemma 4 through llama.cpp.
+- Coding retrieval runs locally.
+- Patient data is encrypted before storage.
+- No hosted LLM or speech API is required for the demo path.
