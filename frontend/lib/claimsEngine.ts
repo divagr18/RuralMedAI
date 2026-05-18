@@ -122,6 +122,10 @@ function lower(value: unknown) {
     return text(value).toLowerCase();
 }
 
+function incomeText(data: PatientData) {
+    return text(data.income_bracket || data.income);
+}
+
 function isNegativeSignal(value: unknown) {
     const raw = lower(value);
     return ['no', 'none', 'nahi', 'not present', 'nil', 'नहीं', 'नही'].includes(raw);
@@ -206,9 +210,10 @@ function buildContext(data: PatientData, transcript: TranscriptItem[]): Eligibil
     const rationCard = lower(data.ration_card_type);
     const caste = lower(data.caste_category);
     const housing = lower(data.housing_type);
-    const incomeText = lower(data.income);
-    const incomeValue = inferIncome(data.income);
-    const monthlyIncome = inferMonthlyIncome(data.income);
+    const income = incomeText(data);
+    const incomeLower = lower(income);
+    const incomeValue = inferIncome(income);
+    const monthlyIncome = inferMonthlyIncome(income);
 
     const hasDiagnosis = Boolean(text(data.tentative_doctor_diagnosis) || text(data.initial_llm_diagnosis));
 
@@ -222,7 +227,7 @@ function buildContext(data: PatientData, transcript: TranscriptItem[]): Eligibil
         hasAge: Boolean(text(data.age)),
         hasGender: Boolean(text(data.gender)),
         hasRationCard: Boolean(text(data.ration_card_type)),
-        hasIncome: Boolean(text(data.income)),
+        hasIncome: Boolean(income),
         hasOccupation: Boolean(text(data.occupation)),
         hasCasteCategory: Boolean(text(data.caste_category)),
         hasHousingType: Boolean(text(data.housing_type)),
@@ -239,7 +244,7 @@ function buildContext(data: PatientData, transcript: TranscriptItem[]): Eligibil
         isEsicOccupation: ['employee', 'worker', 'factory', 'industrial', 'staff', 'salaried', 'private job'].some((token) => occupation.includes(token)),
         isGovernmentEmployee: ['government', 'govt', 'central service', 'state service', 'pensioner'].some((token) => occupation.includes(token)),
         isDefenseBeneficiary: ['veteran', 'ex-serviceman', 'defence', 'defense', 'army', 'navy', 'air force'].some((token) => occupation.includes(token)),
-        isLowIncome: incomeValue !== null ? incomeValue <= 200000 : ['below', 'under', 'low income', 'less than'].some((token) => incomeText.includes(token)),
+        isLowIncome: incomeValue !== null ? incomeValue <= 200000 : ['below', 'under', 'low income', 'less than'].some((token) => incomeLower.includes(token)),
         backendPmjayEligible: Boolean(data.scheme_eligibility?.pmjay?.eligible),
         backendStateEligible: Boolean(data.scheme_eligibility?.state_scheme?.eligible),
     };
@@ -970,7 +975,7 @@ export function buildEligibilityWorkspace(data: PatientData, transcript: Transcr
         { key: 'location', label: 'Location', value: text(data.location) || 'Not captured' },
         { key: 'occupation', label: 'Occupation', value: text(data.occupation) || 'Not captured' },
         { key: 'ration_card_type', label: 'Ration card type', value: text(data.ration_card_type) || 'Not captured' },
-        { key: 'income', label: 'Income', value: text(data.income) || 'Not captured' },
+        { key: 'income', label: 'Income', value: incomeText(data) || 'Not captured' },
         { key: 'caste_category', label: 'Caste category', value: text(data.caste_category) || 'Not captured' },
         { key: 'housing_type', label: 'Housing type', value: text(data.housing_type) || 'Not captured' },
         { key: 'military_status', label: 'Military/veteran status', value: context.isDefenseBeneficiary ? 'Yes' : 'No' },

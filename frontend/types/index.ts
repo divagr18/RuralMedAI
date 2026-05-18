@@ -34,6 +34,8 @@ export interface PatientData {
     procedures?: string[];
     // Eligibility Fields
     ration_card_type?: string;
+    income_bracket?: string;
+    // Legacy draft/session key kept only so old localStorage snapshots do not break.
     income?: string;
     occupation?: string;
     caste_category?: string;

@@ -1,5 +1,5 @@
 # backend/app/core/schema.py
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import Any, Dict, List, Optional
 
 class Vitals(BaseModel):
@@ -63,3 +63,10 @@ class PatientData(BaseModel):
     transcript_summary: Optional[str] = Field(None, description="Important points from the conversation transcript")
     transcript_history: Optional[List[str]] = Field(None, description="Full conversation history for summarization (not stored)")
 
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_legacy_income_field(cls, values: Any) -> Any:
+        if isinstance(values, dict) and not values.get("income_bracket") and values.get("income"):
+            values = dict(values)
+            values["income_bracket"] = values["income"]
+        return values
