@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { ChangeEvent, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PatientData } from '@/types';
@@ -8,11 +8,17 @@ import { ClipboardList, Thermometer, User, Activity, CreditCard, CheckCircle2, I
 
 interface LiveFormProps {
     data: PatientData;
+    onFieldChange?: (field: string, value: string) => void;
 }
 
-export function LiveForm({ data }: LiveFormProps) {
+export function LiveForm({ data, onFieldChange }: LiveFormProps) {
     const { register, setValue, watch } = useForm<PatientData>({ defaultValues: data });
     const [lastUpdatedField, setLastUpdatedField] = useState<string | null>(null);
+    const syncedRegister = (name: any) => register(name, {
+        onChange: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+            onFieldChange?.(String(name), event.target.value);
+        }
+    });
 
     useEffect(() => {
         Object.keys(data).forEach((key) => {
@@ -63,15 +69,15 @@ export function LiveForm({ data }: LiveFormProps) {
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
                                 <div className="md:col-span-2">
-                                    <InputField label="Name" name="name" register={register} highlight={lastUpdatedField === 'name'} placeholder="Full Name" />
+                                    <InputField label="Name" name="name" register={syncedRegister} highlight={lastUpdatedField === 'name'} placeholder="Full Name" />
                                 </div>
-                                <InputField label="Age" name="age" register={register} highlight={lastUpdatedField === 'age'} placeholder="--" />
-                                <InputField label="Gender" name="gender" register={register} highlight={lastUpdatedField === 'gender'} placeholder="--" />
+                                <InputField label="Age" name="age" register={syncedRegister} highlight={lastUpdatedField === 'age'} placeholder="--" />
+                                <InputField label="Gender" name="gender" register={syncedRegister} highlight={lastUpdatedField === 'gender'} placeholder="--" />
                             </div>
                             <InputField
                                 label="Chief Complaint"
                                 name="chief_complaint"
-                                register={register}
+                                register={syncedRegister}
                                 highlight={lastUpdatedField === 'chief_complaint'}
                                 isTextArea
                                 placeholder="Describe symptoms..."
@@ -86,10 +92,10 @@ export function LiveForm({ data }: LiveFormProps) {
                                 <Thermometer className="w-4 h-4" /> Biometrics
                             </div>
                             <div className="grid grid-cols-2 gap-2">
-                                <VitalField label="BP" name="vitals.blood_pressure" register={register} highlight={lastUpdatedField === 'vitals'} unit="mmHg" />
-                                <VitalField label="HR" name="vitals.pulse" register={register} highlight={lastUpdatedField === 'vitals'} unit="BPM" />
-                                <VitalField label="Temp" name="vitals.temperature" register={register} highlight={lastUpdatedField === 'vitals'} unit="°C" />
-                                <VitalField label="SPO2" name="vitals.spo2" register={register} highlight={lastUpdatedField === 'vitals'} unit="%" />
+                                <VitalField label="BP" name="vitals.blood_pressure" register={syncedRegister} highlight={lastUpdatedField === 'vitals'} unit="mmHg" />
+                                <VitalField label="HR" name="vitals.pulse" register={syncedRegister} highlight={lastUpdatedField === 'vitals'} unit="BPM" />
+                                <VitalField label="Temp" name="vitals.temperature" register={syncedRegister} highlight={lastUpdatedField === 'vitals'} unit="°C" />
+                                <VitalField label="SPO2" name="vitals.spo2" register={syncedRegister} highlight={lastUpdatedField === 'vitals'} unit="%" />
                             </div>
                         </div>
                     </div>
@@ -103,12 +109,12 @@ export function LiveForm({ data }: LiveFormProps) {
                     <div className="grid grid-cols-1 md:grid-cols-[1.6fr_1px_1fr] gap-6 items-center">
                         <div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-foreground">
-                                <InputField label="Ration Card" name="ration_card_type" register={register} highlight={lastUpdatedField === 'ration_card_type'} placeholder="Yes/No" />
-                                <InputField label="Income" name="income_bracket" register={register} highlight={lastUpdatedField === 'income_bracket'} placeholder="Per month" />
-                                <InputField label="Occupation" name="occupation" register={register} highlight={lastUpdatedField === 'occupation'} placeholder="Occupation" />
-                                <InputField label="Caste" name="caste_category" register={register} highlight={lastUpdatedField === 'caste_category'} placeholder="SC/ST/OBC" />
-                                <InputField label="Housing" name="housing_type" register={register} highlight={lastUpdatedField === 'housing_type'} placeholder="Kutcha/Pucca" />
-                                <InputField label="Location" name="location" register={register} highlight={lastUpdatedField === 'location'} placeholder="State/City" />
+                                <InputField label="Ration Card" name="ration_card_type" register={syncedRegister} highlight={lastUpdatedField === 'ration_card_type'} placeholder="Yes/No" />
+                                <InputField label="Income" name="income_bracket" register={syncedRegister} highlight={lastUpdatedField === 'income_bracket'} placeholder="Per month" />
+                                <InputField label="Occupation" name="occupation" register={syncedRegister} highlight={lastUpdatedField === 'occupation'} placeholder="Occupation" />
+                                <InputField label="Caste" name="caste_category" register={syncedRegister} highlight={lastUpdatedField === 'caste_category'} placeholder="SC/ST/OBC" />
+                                <InputField label="Housing" name="housing_type" register={syncedRegister} highlight={lastUpdatedField === 'housing_type'} placeholder="Kutcha/Pucca" />
+                                <InputField label="Location" name="location" register={syncedRegister} highlight={lastUpdatedField === 'location'} placeholder="State/City" />
                             </div>
                         </div>
 
@@ -140,7 +146,7 @@ export function LiveForm({ data }: LiveFormProps) {
                         <InputField
                             label="Clinical Impression"
                             name="tentative_doctor_diagnosis"
-                            register={register}
+                            register={syncedRegister}
                             highlight={lastUpdatedField === 'tentative_doctor_diagnosis'}
                             isTextArea
                             placeholder="Physician findings..."
@@ -149,7 +155,7 @@ export function LiveForm({ data }: LiveFormProps) {
                         <InputField
                             label="Diagnostic Rationale"
                             name="initial_llm_diagnosis"
-                            register={register}
+                            register={syncedRegister}
                             highlight={lastUpdatedField === 'initial_llm_diagnosis'}
                             isTextArea
                             placeholder="Observer rationale..."
@@ -377,3 +383,4 @@ function ListSection({ title, items, highlight, placeholder }: any) {
         </div>
     );
 }
+

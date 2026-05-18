@@ -562,7 +562,13 @@ export default function Home() {
                     {/* Scrollable Form Content */}
                     <div className="flex-1 overflow-y-auto p-2">
                         <div className="max-w-7xl mx-auto h-full">
-                            <LiveForm key={formInstanceKey} data={patientData} />
+                            <LiveForm
+                                key={formInstanceKey}
+                                data={patientData}
+                                onFieldChange={(field, value) => {
+                                    setPatientData(prev => applyPatientUpdate(prev, field, value));
+                                }}
+                            />
                         </div>
                     </div>
                 </div>
